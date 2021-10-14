@@ -1,0 +1,43 @@
+# Haskell
+dist
+dist-*
+cabal-dev
+*.o
+*.hi
+*.hie
+*.chi
+*.chs.h
+*.dyn_o
+*.dyn_hi
+.hpc
+.hsenv
+.cabal-sandbox/
+cabal.sandbox.config
+*.prof
+*.aux
+*.hp
+*.eventlog
+.stack-work/
+cabal.project.local
+cabal.project.local~
+.HTF/
+.ghc.environment.*
+
+# Red
+*.red
+Red
+*.v
+
+# generated c 
+*/examples/**/*.c
+
+# output
+*.out
+examples.check
+avalon
+toggle
+*.checked
+*.mif*
+
+# vscode
+*.code-workspace
