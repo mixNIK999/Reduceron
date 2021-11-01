@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module Flite.RedCompile where
 
 -- Parameterise app-length, spine-length and num apps per template,
@@ -135,6 +136,43 @@ flagFuns i p = map flag p
     fl (R.FUN _ n f) = R.FUN (f < i) n f
     fl a = a
 
+-- arity reduction
+arityReduction:: Int -> R.Prog -> R.Prog
+arityReduction narity p = map (mapAllAtoms $ updateFunRefArity narity) p' ++ ts'
+  where
+    (_, ts, p') = runWS (mapM (templateArityReduction narity) p) (length p)
+    ts' = map snd (sortBy cmp ts)
+    cmp (a, b) (c, d) = compare a c
+
+updateFunRefArity :: Int -> R.Atom -> R.Atom
+updateFunRefArity arity (R.FUN sh n f) = R.FUN sh (min arity n) f
+updateFunRefArity _ x = x
+
+mapAllAtoms fun (f, pop, luts, push, apps) = (f, pop, luts, push', apps')
+  where
+    push' = map fun push
+    apps' = map (mapAtoms fun) apps
+
+
+templateArityReduction :: Int -> R.Template -> WriterState (Int, R.Template) Int R.Template
+templateArityReduction narity (f, pop, luts, push, apps)
+  | pop > narity = do
+    nextId <- newId
+    let push' = map (shiftArgs narity) push
+    let apps' = map (mapAtoms (shiftArgs narity)) apps
+    next <- templateArityReduction narity (f, pop - narity, luts, push', apps')
+    write (nextId, next)
+    return (f, narity, [], [R.FUN False (getArity next) nextId], [R.APP False [R.ARG False i] | i <- [0..narity-1]])
+  | otherwise = return (f, pop, luts, push, apps)
+
+shiftArgs offset (R.ARG sh i)
+  | offset > i = R.VAR sh $ i - offset
+  | otherwise = R.ARG sh $ i - offset
+shiftArgs offset (R.VAR sh i) = R.VAR sh $ i - offset
+shiftArgs offset x = x
+
+getArity (_, pop, _, _, _) = pop
+
 -- Fragment a program such that: (1) each template contains at most
 -- 'n' applications; (2) each template contains at most 'm' LUTs; (3)
 -- each template pushes a maximum of 'm' atoms; (4) if a template
@@ -186,7 +224,8 @@ refersCheck _ = False
 redCompile :: (InlineFlag, InlineFlag) -> Bool -> Int -> Int -> Int
            -> Int -> Int -> Prog -> R.Prog
 redCompile hi strictAnan slen alen napps nluts nregs =
-  fragment napps nluts . translate hi strictAnan alen slen nregs
+  -- fragment napps nluts . translate hi strictAnan alen slen nregs
+  fragment napps nluts . arityReduction 7 . translate hi strictAnan alen slen nregs
 
 -- Auxiliary functions
 
